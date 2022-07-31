@@ -154,7 +154,6 @@ with contextlib.ExitStack() as stack:
           #Calculate fps
           current_time = time.monotonic()
           q['counter']+=1
-          q['current_time'] = time.monotonic()
           if (current_time - q['startTime']) > 1 :
               q['fps'] = q['counter'] / (current_time - q['startTime'])
               q['counter'] = 0
