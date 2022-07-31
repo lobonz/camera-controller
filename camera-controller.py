@@ -140,93 +140,91 @@ with contextlib.ExitStack() as stack:
             'previewQueue': device.getOutputQueue(name="rgb", maxSize=4, blocking=False),
             'detectionNNQueue': device.getOutputQueue(name="detections", maxSize=4, blocking=False),
             'xoutBoundingBoxDepthMapping': device.getOutputQueue(name="boundingBoxDepthMapping", maxSize=4, blocking=False),
-            'depthQueue': device.getOutputQueue(name="depth", maxSize=4, blocking=False)
+            'depthQueue': device.getOutputQueue(name="depth", maxSize=4, blocking=False),
+            'fps': 0,
+            'counter': 0,
+            'startTime': time.monotonic()
         }
-
-    startTime = time.monotonic()
-    counter = 0
-    fps = 0
-    
+   
     while True:
-      counter+=1
-      current_time = time.monotonic()
-      print(counter)
-      if (current_time - startTime) > 1 :
-          print("current_time = " + str(current_time))
-          print("startTime    = " + str(startTime))
-          fps = counter / (current_time - startTime)
-          counter = 0
-          startTime = current_time
-          
-      
+
       for mxid, q in devices.items():
-          if q['detectionNNQueue'].has():
+        if q['detectionNNQueue'].has():
+          
+          #Calculate fps
+          current_time = time.monotonic()
+          q['counter']+=1
+          q['current_time'] = time.monotonic()
+          if (current_time - q['startTime']) > 1 :
+              q['fps'] = q['counter'] / (current_time - q['startTime'])
+              q['counter'] = 0
+              q['startTime'] = current_time
               
-              inDetections = q['detectionNNQueue'].get().detections
+          inDetections = q['detectionNNQueue'].get().detections
 
-              if showPreview:
-                inPreview = q['previewQueue'].get().getCvFrame()
-              
+          if showPreview:
+            inPreview = q['previewQueue'].get().getCvFrame()
+          
+          if showDepthMap:
+            depthFrame = q['depthQueue'].get().getFrame()
+            depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+            depthFrameColor = cv2.equalizeHist(depthFrameColor)
+            depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
+
+            if len(inDetections) != 0 and showDepthMap:
+              boundingBoxMapping = q['xoutBoundingBoxDepthMapping'].get()
+              roiDatas = boundingBoxMapping.getConfigData() # roi == region of interest
+
+          if showPreview:
+            height = inPreview.shape[0]
+            width  = inPreview.shape[1]
+            
+          #need index to extract only the required depth data
+          index = 0
+          for detection in inDetections:
+            if detection.label == objectOfIntrest:
+              #Draw Frames on Depth Map for detected objects of interest i.e. people
               if showDepthMap:
-                depthFrame = q['depthQueue'].get().getFrame()
-                depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
-                depthFrameColor = cv2.equalizeHist(depthFrameColor)
-                depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
-
-                if len(inDetections) != 0 and showDepthMap:
-                  boundingBoxMapping = q['xoutBoundingBoxDepthMapping'].get()
-                  roiDatas = boundingBoxMapping.getConfigData() # roi == region of interest
-
+                roiData = roiDatas[index]
+                roi = roiData.roi
+                roi = roi.denormalize(depthFrameColor.shape[1], depthFrameColor.shape[0])
+                topLeft = roi.topLeft()
+                bottomRight = roi.bottomRight()
+                xmin = int(topLeft.x)
+                ymin = int(topLeft.y)
+                xmax = int(bottomRight.x)
+                ymax = int(bottomRight.y)
+                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), 255, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
+                  
               if showPreview:
-                height = inPreview.shape[0]
-                width  = inPreview.shape[1]
+                # Denormalize bounding box
+                x1 = int(detection.xmin * width)
+                x2 = int(detection.xmax * width)
+                y1 = int(detection.ymin * height)
+                y2 = int(detection.ymax * height)
+                try:
+                    label = labelMap[detection.label]
+                except:
+                    label = detection.label
+                cv2.putText(inPreview, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(inPreview, "{:.2f}".format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(inPreview, f"X: {int(detection.spatialCoordinates.x)} mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(inPreview, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(inPreview, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+
+                cv2.rectangle(inPreview, (x1, y1), (x2, y2), (255, 0, 0), cv2.FONT_HERSHEY_SIMPLEX)
                 
-              #need index to extract only the required depth data
-              index = 0
-              for detection in inDetections:
-                if detection.label == objectOfIntrest:
-                  #Draw Frames on Depth Map for detected objects of interest i.e. people
-                  if showDepthMap:
-                    roiData = roiDatas[index]
-                    roi = roiData.roi
-                    roi = roi.denormalize(depthFrameColor.shape[1], depthFrameColor.shape[0])
-                    topLeft = roi.topLeft()
-                    bottomRight = roi.bottomRight()
-                    xmin = int(topLeft.x)
-                    ymin = int(topLeft.y)
-                    xmax = int(bottomRight.x)
-                    ymax = int(bottomRight.y)
-                    cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), 255, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
-                      
-                  if showPreview:
-                    # Denormalize bounding box
-                    x1 = int(detection.xmin * width)
-                    x2 = int(detection.xmax * width)
-                    y1 = int(detection.ymin * height)
-                    y2 = int(detection.ymax * height)
-                    try:
-                        label = labelMap[detection.label]
-                    except:
-                        label = detection.label
-                    cv2.putText(inPreview, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-                    cv2.putText(inPreview, "{:.2f}".format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-                    cv2.putText(inPreview, f"X: {int(detection.spatialCoordinates.x)} mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-                    cv2.putText(inPreview, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-                    cv2.putText(inPreview, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+              # CAPTURE POSITION DATA HERE
+              # print(f"{int(detection.spatialCoordinates.x)} mm, {int(detection.spatialCoordinates.y)} mm, {int(detection.spatialCoordinates.z)} mm")
+            index += index
 
-                    cv2.rectangle(inPreview, (x1, y1), (x2, y2), (255, 0, 0), cv2.FONT_HERSHEY_SIMPLEX)
-                    
-                  # CAPTURE POSITION DATA HERE
-                  # print(f"{int(detection.spatialCoordinates.x)} mm, {int(detection.spatialCoordinates.y)} mm, {int(detection.spatialCoordinates.z)} mm")
-                index += index
-
-              # Show the frame
-              if showDepthMap:
-                cv2.imshow(f"depth- {mxid} ", depthFrameColor)
-              if showPreview:
-                cv2.putText(inPreview, "NN fps: {:.2f}".format(fps), (2, inPreview.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255,255,255))
-                cv2.imshow(f"preview - {mxid}", inPreview)
-      
+          # Show the frame
+          if showDepthMap:
+            cv2.imshow(f"depth- {mxid} ", depthFrameColor)
+          if showPreview:
+            cv2.putText(inPreview, "NN fps: {:.2f}".format(q['fps']), (2, inPreview.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255,255,255))
+            cv2.imshow(f"preview - {mxid}", inPreview)
+    
       # PROCESS DATA HERE
       # SEND TO SERVER
 
