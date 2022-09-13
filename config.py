@@ -3,18 +3,15 @@
 # The remaining interactive screen of 9500x1250mm has a resolution of 5130x675p.
 # Physically its 500mm flat next to directory board, 1000mm curve and then 8000mm flat length.
 
-BNZ = { 'width': 11000, 'depth': 5000, 'zmin': 1500, 'zmax': 5000}
+WALL1 = { 'width': 11000, 'depth': 5000, 'zmin': 1500, 'zmax': 5000} #Dimensions in mm
 
-RD = { 'width': 2500, 'depth': 2500, 'zmin': 1500, 'zmax': 2500}
-# RDENTRANCEWALLWIDTH = 2500
-# RDENTRANCEDEPTH = 2500
+WALL2 = { 'width': 2500, 'depth': 2500, 'zmin': 1500, 'zmax': 2500} #Dimensions in mm
 
-WALL = BNZ
-# WALLWIDTH = BNZWALLWIDTH
-# WALLHEIGHT = BNZSPACEDEPTH
+WALL = CONFIG1
 
 PLANVIEWSCALE = .1
 PLANVIEW = { "scale": PLANVIEWSCALE, "w": int(WALL['width']*PLANVIEWSCALE), "h": int(WALL['depth']*PLANVIEWSCALE) }
+
 #Object describing devices and offsets to apply to positions
 OLDDEVICE = {
   "18443010B15AF40800": { "cam": 1, "offset": {"x":1250 ,"y":600, "z":0}, "type": "S2", "fov": 68.7938}
