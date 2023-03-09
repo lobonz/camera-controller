@@ -10,8 +10,9 @@ import contextlib
 import numpy as np
 import time
 import math
+import os
 
-from config import STRETCH, SHOWDEPTHMAP, SHOWPREVIEW, LABELMAP, OBJECTOFINTEREST, MODEL_PATH, MYDEVICES, PREVIEWSCALE, WALL, XFACTOR, PLANVIEW, SHOWPLANVIEW, SPATIALMERGETOLERANCE
+from config import STRETCH, SHOWDEPTHMAP, SHOWPREVIEW, LABELMAP, OBJECTOFINTEREST, MODEL_PATH, MYDEVICES, PREVIEWSCALE, WALL, XFACTOR, PLANVIEW, SHOWPLANVIEW, SPATIALMERGETOLERANCE, WRITELOG
 
 from Zonemanager import Zonemanager
 zone = Zonemanager()
@@ -19,6 +20,10 @@ targetinfoPrevTime = time.perf_counter()
 targetinfoHangTime = 3
 
 relativetowall = True
+
+if WRITELOG:
+  log = open(os.path.join(os.path.dirname(__file__),'sensor.log'), 'w')
+
 '''
 Spatial detection network.
     Performs inference on RGB camera and retrieves spatial location coordinates: x,y,z relative to the center of depth map.
@@ -43,6 +48,10 @@ def circle(img, center, radius, color):
                thickness,
                line_type)
 
+def phatText(img, text, location, color):
+  #cv2.putText(img, text, location, cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,255),4)
+  cv2.putText(img, text, location, cv2.FONT_HERSHEY_DUPLEX, 1, color,1)
+
 def plan_view(detections):
   #PLANVIEW
   #Create Black Empty Image
@@ -65,12 +74,49 @@ def plan_view(detections):
     ])
     cv2.fillPoly(plan_image, [fov_cnt], color=(70, 70, 70))
 
+  #Draw Key
+  keyx = 10
+  keyy = 20
+  keysize = 20
+  keyspace = 5
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (255, 0, 0), -1)
+  phatText(plan_image, 'Target Live', (keyx + keysize + keyspace , keyy + keysize), (255, 0, 0))
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (255, 0, 255), -1)
+  phatText(plan_image, 'Target Found', (keyx + keysize + keyspace , keyy + keysize), (255, 0, 255))
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (0, 127, 255), -1)
+  phatText(plan_image, 'Velocity', (keyx + keysize + keyspace , keyy + keysize), (0, 127, 255))
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (0, 255, 0), -1)
+  phatText(plan_image, 'Detections', (keyx + keysize + keyspace , keyy + keysize), (0, 255, 0))
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (0, 0, 255), -1)
+  phatText(plan_image, 'New', (keyx + keysize + keyspace , keyy + keysize), (0, 0, 255))
+  
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (0, 255, 255), -1)
+  phatText(plan_image, 'Kept', (keyx + keysize + keyspace , keyy + keysize), (0, 255, 255))
+
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (255, 0, 127), -1)
+  phatText(plan_image, 'Merged', (keyx + keysize + keyspace , keyy + keysize), (255, 0, 127))
+  
+  keyy = keyy + keysize + keyspace
+  cv2.rectangle(plan_image, (keyx, keyy), (keyx+keysize, keyy+keysize), (128, 128, 128), -1)
+  phatText(plan_image, 'Deleted', (keyx + keysize + keyspace , keyy + keysize), (128, 128, 128))
+  
+  
   #Draw Detections
   for i, position in enumerate(detections):
     filled_circle( plan_image, (int(position['x']*PLANVIEW['scale']), int(position['z']*PLANVIEW['scale'])),int(PLANVIEW['h'] / 40),(0, 255, 0))
   
-  
-
   #Draw Position Info
   for i, group in enumerate(zone.targetinfo):
     #print(zone.targetinfo[group])
@@ -96,12 +142,23 @@ def plan_view(detections):
     radius = int(PLANVIEW['h'] / 60)
     targetColor = (255, 0, 255)
     if target.exists:
-      targetColor = (255, 0, 0)
-      cv2.putText(plan_image, target.id[:4], (tx+radius, tz), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0),4)
-      cv2.putText(plan_image, target.id[:4], (tx+radius, tz), cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,255),1)
+      targetColor = (255, 0, 0)    
     filled_circle( plan_image, (tx, tz),radius,targetColor )
     circle( plan_image, (tx, tz),int(SPATIALMERGETOLERANCE * PLANVIEW['scale']),targetColor)
     
+    #velocity vector
+    cv2.line(plan_image, (tx, tz), (int(tx + target.velocity['x']* PLANVIEW['scale']), int(tz + target.velocity['z']* PLANVIEW['scale'])), (0, 127, 255),2)
+    
+    if target.exists:
+      cv2.putText(plan_image, target.id[:4], (tx+radius, tz), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0),4)
+      cv2.putText(plan_image, target.id[:4], (tx+radius, tz), cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,255),1)
+      
+      #Draw Velocity
+      # cv2.putText(plan_image, str(target.velocity['x'])[:4], (tx+radius, tz+4*radius), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0),4)
+      # cv2.putText(plan_image, str(target.velocity['x'])[:4], (tx+radius, tz+4*radius), cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,255),1)
+      #Note really interested in Y :)
+      # cv2.putText(plan_image, str(target.velocity['z'])[:4], (tx+radius, tz+8*radius), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0),4)
+      # cv2.putText(plan_image, str(target.velocity['z'])[:4], (tx+radius, tz+8*radius), cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,255),1)
 
   global targetinfoPrevTime
   global targetinfoHangTime
@@ -298,6 +355,10 @@ with contextlib.ExitStack() as stack:
                           
           for detection in inDetections:
             if detection.label == OBJECTOFINTEREST:
+
+              if WRITELOG:
+                log.write(f"{detection.xmin} {detection.xmax} {detection.ymin} {detection.ymax} {detection.spatialCoordinates.x} {detection.spatialCoordinates.y} {detection.spatialCoordinates.z} {detection.confidence}\n")
+                
               detected_z = int(detection.spatialCoordinates.z + MYDEVICES[mxid]['offset']['z'])
               detected_x = int(detection.spatialCoordinates.x*XFACTOR + MYDEVICES[mxid]['offset']['x'])
               detected_y = int(detection.spatialCoordinates.y + MYDEVICES[mxid]['offset']['y'])
@@ -361,7 +422,7 @@ with contextlib.ExitStack() as stack:
               # 'y_max' bounding box bottom
 
               
-              #Limit appending based on wall limites
+              #Limit appending based on wall limits
               if detected_z < WALL['zmax'] and detected_z > WALL['zmin']:
                 #Limit appending based on camera limits.
                 if detected_x < MYDEVICES[mxid]['xmax'] and detected_x > MYDEVICES[mxid]['xmin'] :
@@ -427,8 +488,7 @@ with contextlib.ExitStack() as stack:
           
       
       # PROCESS DATA HERE & SEND TO SERVER
-      if len(detectedObjects) > 0:
-        zone.update(detectedObjects)
+      zone.update(detectedObjects)
 
       #check for any Targets which may have timed out and send update to Hub.
       zone.sendUpdate()
@@ -437,6 +497,8 @@ with contextlib.ExitStack() as stack:
         cv2.imshow("Plan View", plan_view(detectedObjects))
 
       if cv2.waitKey(1) == ord('q'):
+        if WRITELOG:
+          log.close()
         break
       if cv2.waitKey(1) == ord('.'):
         XFACTOR = XFACTOR + .05

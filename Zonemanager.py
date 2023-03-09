@@ -21,91 +21,100 @@ class Zonemanager:
   # # # # #   U P D A T E   # # # # #
   #
   def update(self, positions):
-    from Target import Target
-    #TODO: NEED TO ONLY MERGE FROM DIFFERENT CAMERAS
-
     mergedpositions = []
-    # Merge points with our SPATIALMERGETOLERANCE and average them
-    # loop through positions
-    if len(positions) > 1:
-      positionIsMerged = [False] * len(positions) #Initialise mergedpositions array with values of False for each position
 
-      #Loop Through Positions Merging Points that are within the tolerance
-      for i in range(len(positions)): # 123456
-        #Check each position against the others one by one
-        #each time around the loop we only check those we
-        #havent checked before by reducing the range we check against.
-        #Any points within the SPATIALMERGETOLERANCE we average to get a final position
-        thisPosition = positions[i]
-        for j in range ( i+1, len(positions)):
-          # print("distance3d")
-          # print(positions[i]['x'], positions[i]['y'], positions[i]['z'] , positions[j]['x'], positions[j]['y'], positions[j]['z'])
-          disttopoint = self.distance3d(positions[i]['x'], positions[i]['y'], positions[i]['z'] , positions[j]['x'], positions[j]['y'], positions[j]['z'])
-          # print(disttopoint)
-          if disttopoint < SPATIALMERGETOLERANCE:
-            averagePosition = self.averagePositions(thisPosition, positions[j])
-            positionIsMerged[i] = True
-            positionIsMerged[j] = True
-            mergedpositions.append(averagePosition)
+    #IF WE HAVE POSITIONS PROCESS THEM
+    if len(positions) > 0:
+      from Target import Target
+      #TODO: NEED TO ONLY MERGE FROM DIFFERENT CAMERAS
 
-            #Add the values we keep to the plan view
-            if SHOWPLANVIEW and positionIsMerged[i] != True:
-              self.targetinfo['merged'].append(positions[i])
-            if SHOWPLANVIEW:
-              self.targetinfo['merged'].append(positions[j])
+      # Merge points with our SPATIALMERGETOLERANCE and average them
+      # loop through positions
+      if len(positions) > 1:
+        positionIsMerged = [False] * len(positions) #Initialise mergedpositions array with values of False for each position
 
-        #If not merged then add the original position to the merged positions
-        if not positionIsMerged[i]:
-          mergedpositions.append(positions[i])
+        #Loop Through Positions Merging Points that are within the tolerance
+        for i in range(len(positions)): # 123456
+          #Check each position against the others one by one
+          #each time around the loop we only check those we
+          #havent checked before by reducing the range we check against.
+          #Any points within the SPATIALMERGETOLERANCE we average to get a final position
+          thisPosition = positions[i]
+          for j in range ( i+1, len(positions)):
+            # print("distance3d")
+            # print(positions[i]['x'], positions[i]['y'], positions[i]['z'] , positions[j]['x'], positions[j]['y'], positions[j]['z'])
+            disttopoint = self.distance3d(positions[i]['x'], positions[i]['y'], positions[i]['z'] , positions[j]['x'], positions[j]['y'], positions[j]['z'])
+            # print(disttopoint)
+            if disttopoint < SPATIALMERGETOLERANCE:
+              averagePosition = self.averagePositions(thisPosition, positions[j])
+              positionIsMerged[i] = True
+              positionIsMerged[j] = True
+              mergedpositions.append(averagePosition)
 
-        #Add the values we keep to the plan view
+              #Add the values we keep to the plan view
+              if SHOWPLANVIEW and positionIsMerged[i] != True:
+                self.targetinfo['merged'].append(positions[i])
+              if SHOWPLANVIEW:
+                self.targetinfo['merged'].append(positions[j])
+
+          #If not merged then add the original position to the merged positions
+          if not positionIsMerged[i]:
+            mergedpositions.append(positions[i])
+
+          #Add the values we keep to the plan view
+          if SHOWPLANVIEW:
+              self.targetinfo['kept'].append(positions[i])
+      
+      if len(positions) == 1: #only 1 position
+        mergedpositions = positions
         if SHOWPLANVIEW:
-            self.targetinfo['kept'].append(positions[i])
+              self.targetinfo['kept'].append(positions[0])
+      
+      #update targets
+      positionswithoutatarget = {}
+      targetswithaposition = [False] * len(self.targets)
+      # find closest target and update with this position.
+      # loop through mergedpositions
+      for i, position in enumerate(mergedpositions):
+          closesttarget = -1
+          #TODO use this value to set a max distance we would consider ok to match to.
+          closestdistance = 3000 #stupid large value bigger than our screen
+          positionswithoutatarget[i] = False
+          #loop through targets to find the closest one
+          for j, target in enumerate(self.targets):
+              if targetswithaposition[j] != True:
+                  targetX, targetY, targetZ = target.predictedPosition()
+                  disttotarget = self.distance3d(position['x'], position['y'], position['z'] , targetX, targetY, targetZ)
+                  if disttotarget < closestdistance:
+                      closesttarget = j
+                      closestdistance = disttotarget
+          #update closest target with position
+          if closesttarget != -1: # we have a target for this position
+              #Update target position and size
+              self.targets[closesttarget].update(position)
+              targetswithaposition[closesttarget] = True
+          else:
+              positionswithoutatarget[i] = True
 
-    if len(positions) == 1: #only 1 position
-      mergedpositions = positions
-      if SHOWPLANVIEW:
-            self.targetinfo['kept'].append(positions[0])
-
-    # print("mergedpositions")
-    # print(mergedpositions)
-
-    #update targets
-    positionswithoutatarget = {}
-    targetswithaposition = [False] * len(self.targets)
-    # find closest target and update with this position.
-    # loop through mergedpositions
-    for i, position in enumerate(mergedpositions):
-        closesttarget = -1
-        #TODO use this value to set a max distance we would consider ok to match to.
-        closestdistance = 3000 #stupid large value bigger than our screen
-        positionswithoutatarget[i] = False
-        #loop through targets to find the closest one
-        for j, target in enumerate(self.targets):
-            if targetswithaposition[j] != True:
-                targetX, targetY, targetZ = target.predictedPosition()
-                disttotarget = self.distance3d(position['x'], position['y'], position['z'] , targetX, targetY, targetZ)
-                if disttotarget < closestdistance:
-                    closesttarget = j
-                    closestdistance = disttotarget
-        #update closest target with position
-        if closesttarget != -1: # we have a target for this position
-            #Update target position and size
-            self.targets[closesttarget].update(position)
-            targetswithaposition[closesttarget] = True
-        else:
-            positionswithoutatarget[i] = True
-
-    # if no targets make a new one.
-    # for key, value in dictionary.items():
-    for i, withoutatarget in positionswithoutatarget.items():
-      #print ("positionswithoutatarget " + str(i) + " = " + str(withoutatarget) )
-      if withoutatarget:
-        #print ("no target")
-        newtarget = Target(mergedpositions[i])
-        self.targets.append(newtarget)
-        if SHOWPLANVIEW:
-            self.targetinfo['new'].append(mergedpositions[i])
+      # if no targets make a new one.
+      # for key, value in dictionary.items():
+      for i, withoutatarget in positionswithoutatarget.items():
+        #print ("positionswithoutatarget " + str(i) + " = " + str(withoutatarget) )
+        if withoutatarget:
+          #print ("no target")
+          newtarget = Target(mergedpositions[i])
+          self.targets.append(newtarget)
+          if SHOWPLANVIEW:
+              self.targetinfo['new'].append(mergedpositions[i])
+      #For Targets we have no position update them with known velocity
+      for i, targethasposition in enumerate(targetswithaposition):
+        if not targethasposition:
+          target.updatePosition()
+    #WE have no positions so update them with known velocity
+    else:
+      #update positions based on velocity
+      for j, target in enumerate(self.targets):
+        target.updatePosition()
 
   #Send data to the server
   def sendUpdate(self):

@@ -3,23 +3,30 @@
 # The remaining interactive screen of 9500x1250mm has a resolution of 5130x675p.
 # Physically its 500mm flat next to directory board, 1000mm curve and then 8000mm flat length.
 
-WALL1 = { 'width': 11000, 'depth': 5000, 'zmin': 1500, 'zmax': 5000} #Dimensions in mm
+BNZ = { 'width': 11000, 'depth': 5000, 'zmin': 750, 'zmax': 5000}
 
-WALL2 = { 'width': 2500, 'depth': 2500, 'zmin': 1500, 'zmax': 2500} #Dimensions in mm
+RD = { 'width': 2500, 'depth': 2500, 'zmin': 1500, 'zmax': 2500}
+# RDENTRANCEWALLWIDTH = 2500
+# RDENTRANCEDEPTH = 2500
 
-WALL = CONFIG1
+WALL = RD
+# WALLWIDTH = BNZWALLWIDTH
+# WALLHEIGHT = BNZSPACEDEPTH
 
-PLANVIEWSCALE = .1
+PLANVIEWSCALE = .3
 PLANVIEW = { "scale": PLANVIEWSCALE, "w": int(WALL['width']*PLANVIEWSCALE), "h": int(WALL['depth']*PLANVIEWSCALE) }
-
 #Object describing devices and offsets to apply to positions
 OLDDEVICE = {
   "18443010B15AF40800": { "cam": 1, "offset": {"x":1250 ,"y":600, "z":0}, "type": "S2", "fov": 68.7938}
   }
 
+FONTERRADEVICE = {
+  "194430103182F51200": { "cam": 1, "offset": {"x":1250 ,"y":600, "z":0}, 'xmax':2000, 'xmin':0, "type": "S2", "fov": 68.7938}, 
+  }
+
 STANDARDDEVICES = {
-  "194430103182F51200": { "cam": 1, "offset": {"x":2000 ,"y":600, "z":0}, "type": "S2", "fov": 68.7938}, 
-  "1944301031E0F41200": { "cam": 2, "offset": {"x":2000+1500 ,"y":600, "z":0}, "type": "S2", "fov": 68.7938}
+  "194430103182F51200": { "cam": 1, "offset": {"x":2000 ,"y":600, "z":0}, 'xmax':2000+(1500/2), 'xmin':0, "type": "S2", "fov": 68.7938}, 
+  "1944301031E0F41200": { "cam": 2, "offset": {"x":2000+1500 ,"y":600, "z":0}, 'xmax':BNZ['width'], 'xmin':2000+1500-(1500/2), "type": "S2", "fov": 68.7938}
   }
 
 WIDEDEVICES = {
@@ -36,10 +43,10 @@ WIDEDEVICESZERO = {
 XFACTOR_WIDE = .63
 XFACTOR_STD = 1
 
-MYDEVICES = WIDEDEVICES
-XFACTOR = XFACTOR_WIDE # measurement scaling factor to correct X Measurements
+MYDEVICES = FONTERRADEVICE
+XFACTOR = XFACTOR_STD # measurement scaling factor to correct X Measurements
 
-PREVIEWSCALE = 1
+PREVIEWSCALE = 2
 STRETCH = False # set to false for Letterbox
 
 SHOWDEPTHMAP = False #show the depth Map
@@ -60,8 +67,10 @@ LABEL_MAP = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bu
 
 TIMEDOUTTIME = 4 #how long without an update before we delete a target
 NOTTRACKEDTIME = 3 #how long till we consider it not tracked anymore - used to send nottracked to Unreal
-EXISTSTRACKEDTIME = 3 #how long to exist before we treat as live
-
-SPATIALMERGETOLERANCE = 800
+EXISTSTRACKEDTIME = 1 #how long to exist before we treat as live
+MAXVELOCITY = 600 #mm/s
+DECELERATION = 25 #mm/s
+SPATIALMERGETOLERANCE = 600
 
 DEBUG = True
+WRITELOG = True
